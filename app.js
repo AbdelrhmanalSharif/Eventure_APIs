@@ -5,12 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
-// Import routes
-const userRoutes = require('./routes/userRoutes');
-const eventRoutes = require('./routes/eventRoutes');
-// Import other routes as needed
-
-const app = express();
+const app = express(); 
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -18,10 +13,9 @@ app.use(cors()); // Enable CORS for all routes
 app.use(express.json()); // Parse JSON bodies
 app.use(morgan('dev')); // Logging
 
-// Routes
-app.use('/api/users', userRoutes);
-app.use('/api/events', eventRoutes);
-// Register other routes
+// Import and use routes
+const apiRoutes = require('./routes');
+app.use('/api', apiRoutes); 
 
 // Home route
 app.get('/', (req, res) => {

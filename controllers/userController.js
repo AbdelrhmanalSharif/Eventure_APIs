@@ -235,9 +235,16 @@ const changePassword = async (req, res) => {
     }
     
     // Hash new password
-    const salt = await bcrypt.genSalt(passwordConfig.saltRounds);
-    const newHashedPassword = await bcrypt.hash(newPassword, salt);
-    const newPasswordBuffer = Buffer.from(newHashedPassword);
+    const saltRounds = passwordConfig?.saltRounds || 10;
+    const salt = await bcrypt.genSalt(saltRounds);
+    const passwordHash = await bcrypt.hash(password, salt);
+    
+    if (!passwordHash) {
+      return res.status(500).json({ message: 'Password hashing failed' });
+    }
+    
+    const passwordBuffer = Buffer.from(passwordHash);
+    
     
     // Update password
     await pool.request()
