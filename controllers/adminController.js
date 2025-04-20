@@ -109,7 +109,6 @@ const getPlatformStats = async (req, res) => {
         (SELECT COUNT(*) FROM Bookings) AS bookingCount,
         (SELECT COUNT(*) FROM Payments) AS paymentCount
     `);
-
     res.status(200).json(result.recordset[0]);
   } catch (error) {
     console.error('Admin getPlatformStats error:', error);
