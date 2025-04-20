@@ -1,13 +1,28 @@
 const express = require('express');
 const router = express.Router();
 
-router.use('/users', require('./userRoutes'));
-router.use('/events', require('./eventRoutes'));
-router.use('/reviews', require('./reviewRoutes'));
-router.use('/bookings', require('./bookingRoutes'));
-router.use('/payments', require('./paymentRoutes'));
-router.use('/recommendations', require('./recommendationRoutes'));
-router.use('/ads', require('./adRoutes'));
-router.use('/admin', require('./adminRoutes'));
+// Route modules
+const userRoutes = require('./userRoutes');
+const eventRoutes = require('./eventRoutes');
+const adminRoutes = require('./adminRoutes');
+const companyRoutes = require('./companyRoutes');
+const searchRoutes = require('./searchRoutes');
+const bookingRoutes = require('./bookingRoutes');
+const paymentRoutes = require('./paymentRoutes');
+const reviewRoutes = require('./reviewRoutes');
+const adRoutes = require('./adRoutes');
+const recommendationRoutes = require('./recommendationRoutes');
+
+// Use routes with appropriate base paths
+router.use('/users', userRoutes);
+router.use('/events', eventRoutes);
+router.use('/admin', adminRoutes);
+router.use('/company', companyRoutes);
+router.use('/search', searchRoutes);
+router.use('/bookings', bookingRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/reviews', reviewRoutes);
+router.use('/ads', adRoutes);
+router.use('/recommendations', recommendationRoutes);
 
 module.exports = router;

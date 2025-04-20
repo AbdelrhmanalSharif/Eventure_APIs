@@ -1,15 +1,16 @@
-const jwt = require('jsonwebtoken');
-const { jwtConfig } = require('../config/authConfig');
+const jwt = require('jsonwebtoken'); // mn3mela import to handle JWt verification and signing
+const { jwtConfig } = require('../config/authConfig'); //load el key 
 
-// Middleware to verify JWT token
+// middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN format
+  const authHeader = req.headers['authorization']; // bte5od el token men el header
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer token format (Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5...)
   
+//eza token missing block access
   if (!token) {
     return res.status(401).json({ message: 'Access denied. No token provided.' });
   }
-
+// eza valid by3mel decode w store bel req.user w eza la2 btale3 error 
   try {
     const verified = jwt.verify(token, jwtConfig.secret);
     req.user = verified;
@@ -19,7 +20,7 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Middleware to check user type/role
+// middleware to check user type/role eza admin or company or individual by3mel accept eza la2 ma by3mel allowedRoles howe el array
 const authorizeRole = (allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {

@@ -1,12 +1,29 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const {
-  bookEvent,
-  getUserBookings,
-} = require("../controllers/bookingController");
-const { authenticateToken } = require("../middlewares/auth");
+const bookingController = require('../controllers/bookingController');
+const { authenticateToken, authorizeRole } = require('../middlewares/auth');
 
-router.post("/", authenticateToken, bookEvent);
-router.get("/", authenticateToken, getUserBookings);
+// All routes below require the user to be authenticated and of type 'Individual'
+
+router.post(
+  '/',
+  authenticateToken,
+  authorizeRole(['Individual']),
+  bookingController.bookEvent
+);
+
+router.get(
+  '/',
+  authenticateToken,
+  authorizeRole(['Individual']),
+  bookingController.getUserBookings
+);
+
+router.delete(
+  '/:eventId',
+  authenticateToken,
+  authorizeRole(['Individual']),
+  bookingController.cancelBooking
+);
 
 module.exports = router;

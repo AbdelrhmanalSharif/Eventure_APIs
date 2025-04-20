@@ -1,3 +1,4 @@
+//import
 const { sql, poolPromise } = require('../config/database');
 
 // Create ad

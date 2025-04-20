@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const reviewController = require('../controllers/reviewController');
-const { authenticateToken } = require('../middlewares/auth');
+const { authenticateToken, authorizeRole } = require('../middlewares/auth');
 
-router.post('/', authenticateToken, reviewController.addReview);
-router.put('/:reviewId', authenticateToken, reviewController.updateReview);
-router.delete('/:reviewId', authenticateToken, reviewController.deleteReview);
+// All review routes require authentication
+router.post('/', authenticateToken, authorizeRole(['Individual']), reviewController.addReview);
+router.put('/:reviewId', authenticateToken, authorizeRole(['Individual']), reviewController.updateReview);
+router.delete('/:reviewId', authenticateToken, authorizeRole(['Individual']), reviewController.deleteReview);
 
 module.exports = router;

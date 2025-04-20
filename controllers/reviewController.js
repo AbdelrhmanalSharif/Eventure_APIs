@@ -1,5 +1,6 @@
 const { sql, poolPromise } = require('../config/database');
 
+// Add a review
 const addReview = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -11,6 +12,26 @@ const addReview = async (req, res) => {
 
     const pool = await poolPromise;
 
+    // Check if event exists
+    const eventCheck = await pool.request()
+      .input('eventId', sql.Int, eventId)
+      .query('SELECT 1 FROM Events WHERE EventID = @eventId');
+
+    if (eventCheck.recordset.length === 0) {
+      return res.status(404).json({ message: 'Event does not exist' });
+    }
+
+    // Check if user booked this event
+    const bookingCheck = await pool.request()
+      .input('userId', sql.Int, userId)
+      .input('eventId', sql.Int, eventId)
+      .query('SELECT 1 FROM Bookings WHERE UserID = @userId AND EventID = @eventId');
+
+    if (bookingCheck.recordset.length === 0) {
+      return res.status(403).json({ message: 'You must book the event before reviewing it' });
+    }
+
+    // Insert review
     await pool.request()
       .input('userId', sql.Int, userId)
       .input('eventId', sql.Int, eventId)
@@ -28,6 +49,7 @@ const addReview = async (req, res) => {
   }
 };
 
+// Update a review
 const updateReview = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -58,6 +80,7 @@ const updateReview = async (req, res) => {
   }
 };
 
+// Delete a review
 const deleteReview = async (req, res) => {
   try {
     const userId = req.user.userId;

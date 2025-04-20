@@ -1,5 +1,6 @@
 const { sql, poolPromise } = require('../config/database');
 
+// Add a recommendation (manual)
 const addRecommendation = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -21,6 +22,7 @@ const addRecommendation = async (req, res) => {
 
     res.status(201).json({ message: 'Event recommended successfully' });
   } catch (error) {
+    // SQL unique constraint violation (e.g. duplicate recommendation)
     if (error.originalError?.info?.number === 2627) {
       return res.status(409).json({ message: 'You already recommended this event' });
     }
@@ -29,6 +31,7 @@ const addRecommendation = async (req, res) => {
   }
 };
 
+// Get recommendations manually added by user
 const getRecommendationsForUser = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -51,17 +54,17 @@ const getRecommendationsForUser = async (req, res) => {
   }
 };
 
-//behavioral recommendation
+// Behavioral recommendation based on past interactions
 const getBehavioralRecommendations = async (req, res) => {
   try {
     const userId = req.user.userId;
     const pool = await poolPromise;
 
-    // Top categories from bookings
-    const bookingCatResult = await pool.request()
+    // Bookings - favorite categories
+    const bookingCats = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
-        SELECT TOP 3 e.Category, COUNT(*) as Count
+        SELECT TOP 3 e.Category, COUNT(*) AS Count
         FROM Bookings b
         JOIN Events e ON b.EventID = e.EventID
         WHERE b.UserID = @userId
@@ -69,11 +72,11 @@ const getBehavioralRecommendations = async (req, res) => {
         ORDER BY Count DESC
       `);
 
-    // Top categories from reviews
-    const reviewCatResult = await pool.request()
+    // Highly rated reviews
+    const reviewCats = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
-        SELECT TOP 3 e.Category, COUNT(*) as Count
+        SELECT TOP 3 e.Category, COUNT(*) AS Count
         FROM Reviews r
         JOIN Events e ON r.EventID = e.EventID
         WHERE r.UserID = @userId AND r.Rating >= 4
@@ -81,8 +84,8 @@ const getBehavioralRecommendations = async (req, res) => {
         ORDER BY Count DESC
       `);
 
-    // Top locations from search history
-    const searchLocResult = await pool.request()
+    // Frequent search locations
+    const searchLocs = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
         SELECT TOP 3 SearchQuery
@@ -92,18 +95,18 @@ const getBehavioralRecommendations = async (req, res) => {
       `);
 
     const topCategories = new Set();
-    bookingCatResult.recordset.forEach(row => topCategories.add(row.Category));
-    reviewCatResult.recordset.forEach(row => topCategories.add(row.Category));
-
-    const topLocations = searchLocResult.recordset.map(row => row.SearchQuery);
+    bookingCats.recordset.forEach(row => topCategories.add(row.Category));
+    reviewCats.recordset.forEach(row => topCategories.add(row.Category));
+    const topLocations = searchLocs.recordset.map(row => row.SearchQuery);
 
     if (topCategories.size === 0 && topLocations.length === 0) {
-      return res.status(404).json({ message: 'Not enough data to generate recommendations' });
+      return res.status(404).json({ message: 'Not enough user data to generate recommendations' });
     }
 
+    // Build event query
     let query = `
-      SELECT DISTINCT TOP 10 e.*, u.FullName as CompanyName,
-        (SELECT AVG(CAST(r.Rating as FLOAT)) FROM Reviews r WHERE r.EventID = e.EventID) as AvgRating
+      SELECT DISTINCT TOP 10 e.*, u.FullName AS CompanyName,
+        (SELECT AVG(CAST(r.Rating AS FLOAT)) FROM Reviews r WHERE r.EventID = e.EventID) AS AvgRating
       FROM Events e
       LEFT JOIN Users u ON e.CompanyID = u.UserID
       WHERE e.StartDate >= GETDATE()
@@ -112,17 +115,16 @@ const getBehavioralRecommendations = async (req, res) => {
     const queryParams = [];
 
     if (topCategories.size > 0) {
-      const categoryList = [...topCategories];
-      const catConditions = categoryList.map((cat, i) => `e.Category = @cat${i}`).join(' OR ');
-      query += ` AND (${catConditions})`;
-      categoryList.forEach((cat, i) => {
+      const categoryConditions = [...topCategories].map((cat, i) => `e.Category = @cat${i}`).join(' OR ');
+      query += ` AND (${categoryConditions})`;
+      [...topCategories].forEach((cat, i) => {
         queryParams.push({ name: `cat${i}`, type: sql.NVarChar, value: cat });
       });
     }
 
     if (topLocations.length > 0) {
-      const locConditions = topLocations.map((loc, i) => `e.Location LIKE @loc${i}`).join(' OR ');
-      query += ` AND (${locConditions})`;
+      const locationConditions = topLocations.map((loc, i) => `e.Location LIKE @loc${i}`).join(' OR ');
+      query += ` AND (${locationConditions})`;
       topLocations.forEach((loc, i) => {
         queryParams.push({ name: `loc${i}`, type: sql.NVarChar, value: `%${loc}%` });
       });
@@ -137,7 +139,7 @@ const getBehavioralRecommendations = async (req, res) => {
     res.status(200).json(result.recordset);
   } catch (error) {
     console.error('Behavioral recommendation error:', error);
-    res.status(500).json({ message: 'Failed to generate behavioral recommendations', error: error.message });
+    res.status(500).json({ message: 'Server error while generating recommendations' });
   }
 };
 

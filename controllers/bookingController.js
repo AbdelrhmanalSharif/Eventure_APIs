@@ -1,23 +1,29 @@
 const { sql, poolPromise } = require('../config/database');
 
+// Book an event
 const bookEvent = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const eventId = parseInt(req.params.eventId);
+    const { eventId } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({ message: 'Event ID is required in the request body' });
+    }
+
     const pool = await poolPromise;
 
-    // Check if the event exists and get max attendees and price
+    // Check event existence and capacity
     const eventResult = await pool.request()
       .input('eventId', sql.Int, eventId)
-      .query('SELECT MaxAttendees, Price FROM Events WHERE EventID = @eventId');
+      .query('SELECT MaxAttendees FROM Events WHERE EventID = @eventId');
 
     if (eventResult.recordset.length === 0) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    const { MaxAttendees, Price } = eventResult.recordset[0];
+    const { MaxAttendees } = eventResult.recordset[0];
 
-    // Check if user already booked the event
+    // Prevent duplicate bookings
     const existingBooking = await pool.request()
       .input('userId', sql.Int, userId)
       .input('eventId', sql.Int, eventId)
@@ -38,7 +44,7 @@ const bookEvent = async (req, res) => {
       }
     }
 
-    // Check if the user has completed payment for this event
+    // Ensure user has completed payment
     const paymentResult = await pool.request()
       .input('userId', sql.Int, userId)
       .input('eventId', sql.Int, eventId)
@@ -51,7 +57,7 @@ const bookEvent = async (req, res) => {
       return res.status(402).json({ message: 'Payment required to complete booking' });
     }
 
-    // Book the event
+    // Proceed with booking
     const bookingResult = await pool.request()
       .input('userId', sql.Int, userId)
       .input('eventId', sql.Int, eventId)
@@ -71,6 +77,7 @@ const bookEvent = async (req, res) => {
   }
 };
 
+// View user bookings
 const getUserBookings = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -93,13 +100,14 @@ const getUserBookings = async (req, res) => {
   }
 };
 
+// Cancel a booking
 const cancelBooking = async (req, res) => {
   try {
     const userId = req.user.userId;
     const eventId = parseInt(req.params.eventId);
     const pool = await poolPromise;
 
-    await pool.request()
+    const result = await pool.request()
       .input('userId', sql.Int, userId)
       .input('eventId', sql.Int, eventId)
       .query('DELETE FROM Bookings WHERE UserID = @userId AND EventID = @eventId');
