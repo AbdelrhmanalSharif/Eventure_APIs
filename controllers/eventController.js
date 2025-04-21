@@ -183,6 +183,35 @@ const getEventCategories = async (req, res) => {
   }
 };
 
+const uploadMultipleEventImages = async (req, res) => {
+  try {
+    const eventId = parseInt(req.params.id);
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: 'No images provided' });
+    }
+
+    const pool = await poolPromise;
+
+    for (const file of files) {
+      const imagePath = `/uploads/events/${file.filename}`;
+      await pool.request()
+        .input('eventId', sql.Int, eventId)
+        .input('imageUrl', sql.NVarChar, imagePath)
+        .query(`
+          INSERT INTO EventImages (EventID, ImageURL)
+          VALUES (@eventId, @imageUrl)
+        `);
+    }
+
+    res.status(201).json({ message: 'Images uploaded successfully' });
+  } catch (error) {
+    console.error('Upload multiple images error:', error);
+    res.status(500).json({ message: 'Server error while uploading images', error: error.message });
+  }
+};
+
 const deleteEventImage = async (req, res) => {
   try {
     const imageId = parseInt(req.params.imageId);
@@ -221,5 +250,6 @@ module.exports = {
   getAllEvents,
   getEventById,
   getEventCategories,
-  deleteEventImage
+  deleteEventImage,
+  uploadMultipleEventImages
 };
