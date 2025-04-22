@@ -4,6 +4,7 @@ const router = express.Router();
 // Route modules
 const userRoutes = require('./userRoutes');
 const eventRoutes = require('./eventRoutes');
+const individualRoutes = require('./individualRoutes');
 const adminRoutes = require('./adminRoutes');
 const companyRoutes = require('./companyRoutes');
 const searchRoutes = require('./searchRoutes');
@@ -16,6 +17,7 @@ const recommendationRoutes = require('./recommendationRoutes');
 // Use routes with appropriate base paths
 router.use('/users', userRoutes);
 router.use('/events', eventRoutes);
+router.use('/individual', individualRoutes);
 router.use('/admin', adminRoutes);
 router.use('/company', companyRoutes);
 router.use('/search', searchRoutes);
