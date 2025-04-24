@@ -1,4 +1,5 @@
 const { sql, poolPromise } = require('../config/database');
+const { getFullEventById } = require('../utils/fetchFullEvent');
 
 // Book an event
 const bookEvent = async (req, res) => {
@@ -85,15 +86,22 @@ const getUserBookings = async (req, res) => {
 
     const result = await pool.request()
       .input('userId', sql.Int, userId)
-      .query(`
-        SELECT b.BookingID, b.BookedAt, e.EventID, e.Title, e.Location, e.StartDate, e.EndDate
-        FROM Bookings b
-        JOIN Events e ON b.EventID = e.EventID
-        WHERE b.UserID = @userId
-        ORDER BY b.BookedAt DESC
-      `);
+      .query(`SELECT BookingID, EventID, BookedAt FROM Bookings WHERE UserID = @userId ORDER BY BookedAt DESC`);
 
-    res.status(200).json(result.recordset);
+    const bookings = [];
+
+    for (const row of result.recordset) {
+      const event = await getFullEventById(row.EventID);
+      if (event) {
+        bookings.push({
+          bookingId: row.BookingID,
+          bookedAt: row.BookedAt,
+          event
+        });
+      }
+    }
+
+    res.status(200).json(bookings);
   } catch (error) {
     console.error('Fetch bookings error:', error);
     res.status(500).json({ message: 'Server error while fetching bookings', error: error.message });
