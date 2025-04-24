@@ -1,4 +1,5 @@
 const { sql, poolPromise } = require('../config/database');
+const { getFullEventById } = require('../utils/fetchFullEvent');
 
 // Create event by Individual
 const createEvent = async (req, res) => {
@@ -55,21 +56,30 @@ const createEvent = async (req, res) => {
   }
 };
 
+
 // Get all events created by the individual
 const getMyEvents = async (req, res) => {
   try {
     const userId = req.user.userId;
     const pool = await poolPromise;
+
     const result = await pool.request()
       .input('userId', sql.Int, userId)
-      .query('SELECT * FROM Events WHERE CompanyID = @userId ORDER BY CreatedAt DESC');
+      .query('SELECT EventID FROM Events WHERE CompanyID = @userId ORDER BY CreatedAt DESC');
 
-    res.status(200).json(result.recordset);
+    const events = [];
+    for (const row of result.recordset) {
+      const fullEvent = await getFullEventById(row.EventID);
+      if (fullEvent) events.push(fullEvent);
+    }
+
+    res.status(200).json(events);
   } catch (error) {
     console.error('Get individual events error:', error);
     res.status(500).json({ message: 'Server error while fetching events', error: error.message });
   }
 };
+
 
 // Update event
 const updateEvent = async (req, res) => {
@@ -132,7 +142,8 @@ const updateEvent = async (req, res) => {
       }
     }
 
-    res.status(200).json({ message: 'Event updated successfully' });
+  const updatedEvent = await getFullEventById(eventId);
+  res.status(200).json({ message: 'Event updated successfully', event: updatedEvent });
   } catch (error) {
     console.error('Update event error:', error);
     res.status(500).json({ message: 'Server error while updating event', error: error.message });
