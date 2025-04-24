@@ -1,4 +1,5 @@
 const { sql, poolPromise } = require('../config/database');
+const { getFullEventById } = require('../utils/fetchFullEvent');
 const path = require('path');
 const fs = require('fs');
 
@@ -117,53 +118,12 @@ const getAllEvents = async (req, res) => {
 const getEventById = async (req, res) => {
   try {
     const { id } = req.params;
-    const pool = await poolPromise;
-
-    const eventResult = await pool.request()
-      .input('eventId', sql.Int, id)
-      .query(`
-        SELECT e.*, u.FullName AS CompanyName, u.Email AS CompanyEmail,
-          (SELECT AVG(CAST(r.Rating AS FLOAT)) FROM Reviews r WHERE r.EventID = e.EventID) AS AverageRating,
-          m.Latitude, m.Longitude
-        FROM Events e
-        LEFT JOIN Users u ON e.CompanyID = u.UserID
-        LEFT JOIN MapsIntegration m ON e.EventID = m.EventID
-        WHERE e.EventID = @eventId
-      `);
-
-    if (eventResult.recordset.length === 0) {
+    const event = await getFullEventById(id);
+    
+    if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
-
-    const event = eventResult.recordset[0];
-
-    const imagesResult = await pool.request()
-      .input('eventId', sql.Int, id)
-      .query('SELECT ImageID, ImageURL FROM EventImages WHERE EventID = @eventId');
-    event.images = imagesResult.recordset;
-
-    const reviewsResult = await pool.request()
-      .input('eventId', sql.Int, id)
-      .query(`
-        SELECT r.ReviewID, r.Rating, r.ReviewText, r.CreatedAt,
-          u.FullName AS ReviewerName, u.ProfilePicture AS ReviewerPicture
-        FROM Reviews r
-        LEFT JOIN Users u ON r.UserID = u.UserID
-        WHERE r.EventID = @eventId
-        ORDER BY r.CreatedAt DESC
-      `);
-    event.reviews = reviewsResult.recordset;
-
-    const categoryResult = await pool.request()
-      .input('eventId', sql.Int, id)
-      .query(`
-        SELECT c.Name 
-        FROM EventCategories ec
-        JOIN Categories c ON ec.CategoryID = c.CategoryID
-        WHERE ec.EventID = @eventId
-      `);
-    event.categories = categoryResult.recordset.map(c => c.Name);
-
+    
     res.status(200).json(event);
   } catch (error) {
     console.error('Get event by ID error:', error);
