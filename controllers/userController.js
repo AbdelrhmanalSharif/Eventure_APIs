@@ -12,9 +12,14 @@ const registerUser = async (req, res) => {
   try {
     const { fullName, email, password, userType } = req.body;
     const profilePicture = req.file ? `/uploads/users/${req.file.filename}` : null;
-
+    
     if (!fullName || !email || !password || !userType) {
       return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
     }
 
     const allowedUserTypes = ['Admin', 'Company', 'Individual'];
