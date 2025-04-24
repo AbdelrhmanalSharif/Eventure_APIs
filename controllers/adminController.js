@@ -1,4 +1,5 @@
 const { sql, poolPromise } = require('../config/database');
+const { getFullEventById } = require('../utils/fetchFullEvent');
 
 // Get all non-admin users, grouped by type
 const getAllUsers = async (req, res) => {
@@ -29,39 +30,16 @@ const getAllEvents = async (req, res) => {
   try {
     const pool = await poolPromise;
 
-    const eventResult = await pool.request().query(`
-      SELECT e.EventID, e.Title, e.Description, e.Location, e.Price, e.Currency,
-             e.StartDate, e.EndDate, e.MaxAttendees, e.CreatedAt,
-             u.FullName AS CompanyName,
-             m.Latitude, m.Longitude,
-             STRING_AGG(c.Name, ',') AS Categories
-      FROM Events e
-      LEFT JOIN Users u ON e.CompanyID = u.UserID
-      LEFT JOIN MapsIntegration m ON e.EventID = m.EventID
-      LEFT JOIN EventCategories ec ON e.EventID = ec.EventID
-      LEFT JOIN Categories c ON ec.CategoryID = c.CategoryID
-      GROUP BY e.EventID, e.Title, e.Description, e.Location, e.Price, e.Currency,
-               e.StartDate, e.EndDate, e.MaxAttendees, e.CreatedAt,
-               u.FullName, m.Latitude, m.Longitude
-      ORDER BY e.StartDate DESC
+    const result = await pool.request().query(`
+      SELECT EventID FROM Events
+      ORDER BY StartDate DESC
     `);
 
-    const events = eventResult.recordset;
-
-    const imageResult = await pool.request().query(`
-      SELECT EventID, ImageID, ImageURL FROM EventImages
-    `);
-
-    const imageMap = {};
-    imageResult.recordset.forEach(img => {
-      if (!imageMap[img.EventID]) imageMap[img.EventID] = [];
-      imageMap[img.EventID].push({ ImageID: img.ImageID, ImageURL: img.ImageURL });
-    });
-
-    events.forEach(event => {
-      event.Images = imageMap[event.EventID] || [];
-      event.Categories = event.Categories ? event.Categories.split(',') : [];
-    });
+    const events = [];
+    for (const row of result.recordset) {
+      const fullEvent = await getFullEventById(row.EventID);
+      if (fullEvent) events.push(fullEvent);
+    }
 
     res.status(200).json(events);
   } catch (error) {
@@ -109,6 +87,7 @@ const getPlatformStats = async (req, res) => {
         (SELECT COUNT(*) FROM Bookings) AS bookingCount,
         (SELECT COUNT(*) FROM Payments) AS paymentCount
     `);
+
     res.status(200).json(result.recordset[0]);
   } catch (error) {
     console.error('Admin getPlatformStats error:', error);
