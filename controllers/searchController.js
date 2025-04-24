@@ -1,4 +1,5 @@
 const { sql, poolPromise } = require('../config/database');
+const { getFullEventById } = require('../utils/fetchFullEvent');
 
 const globalSearch = async (req, res) => {
   try {
@@ -11,21 +12,26 @@ const globalSearch = async (req, res) => {
     const pool = await poolPromise;
     const results = {};
 
-    // Search Events
-    const events = await pool.request()
+    // Search Events (fetch only IDs for efficiency)
+    const eventIdResults = await pool.request()
       .input('searchTerm', sql.NVarChar, `%${q}%`)
       .query(`
-        SELECT e.*, u.FullName AS CompanyName
+        SELECT e.EventID
         FROM Events e
         LEFT JOIN Users u ON e.CompanyID = u.UserID
         WHERE e.Title LIKE @searchTerm
            OR e.Description LIKE @searchTerm
-           OR e.Category LIKE @searchTerm
            OR e.Location LIKE @searchTerm
       `);
-    results.events = events.recordset;
 
-    // Search Reviews
+    const fullEvents = [];
+    for (const row of eventIdResults.recordset) {
+      const fullEvent = await getFullEventById(row.EventID);
+      if (fullEvent) fullEvents.push(fullEvent);
+    }
+    results.events = fullEvents;
+
+    // Search Reviews (no change needed)
     const reviews = await pool.request()
       .input('searchTerm', sql.NVarChar, `%${q}%`)
       .query(`
@@ -38,7 +44,7 @@ const globalSearch = async (req, res) => {
       `);
     results.reviews = reviews.recordset;
 
-    // Search Users (optional, only if Admin-only access later)
+    // Search Users
     const users = await pool.request()
       .input('searchTerm', sql.NVarChar, `%${q}%`)
       .query(`
