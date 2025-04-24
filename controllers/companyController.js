@@ -1,4 +1,5 @@
 const { sql, poolPromise } = require('../config/database');
+const { getFullEventById } = require('../utils/fetchFullEvent');
 
 // Create a new event (Company only)
 const createCompanyEvent = async (req, res) => {
@@ -61,7 +62,8 @@ const createCompanyEvent = async (req, res) => {
       }
 
       await transaction.commit();
-      res.status(201).json({ message: 'Event created', eventId });
+      const fullEvent = await getFullEventById(eventId);
+      res.status(201).json({ message: 'Event created successfully', event: fullEvent });
     } catch (error) {
       await transaction.rollback();
       throw error;
@@ -77,14 +79,21 @@ const getCompanyEvents = async (req, res) => {
   try {
     const companyId = req.user.userId;
     const pool = await poolPromise;
+
     const result = await pool.request()
       .input('companyId', sql.Int, companyId)
-      .query(`SELECT * FROM Events WHERE CompanyID = @companyId ORDER BY CreatedAt DESC`);
+      .query('SELECT EventID FROM Events WHERE CompanyID = @companyId ORDER BY CreatedAt DESC');
 
-    res.status(200).json(result.recordset);
+    const events = [];
+    for (const row of result.recordset) {
+      const event = await getFullEventById(row.EventID);
+      if (event) events.push(event);
+    }
+
+    res.status(200).json(events);
   } catch (error) {
-    console.error('Get company events error:', error);
-    res.status(500).json({ message: 'Server error while fetching events', error: error.message });
+    console.error('Fetch company events error:', error);
+    res.status(500).json({ message: 'Server error while fetching company events', error: error.message });
   }
 };
 
@@ -178,7 +187,8 @@ const updateCompanyEvent = async (req, res) => {
       }
 
       await transaction.commit();
-      res.status(200).json({ message: 'Event updated successfully' });
+      const updatedEvent = await getFullEventById(eventId);
+      res.status(200).json({ message: 'Event updated successfully', event: updatedEvent });
     } catch (error) {
       await transaction.rollback();
       throw error;
