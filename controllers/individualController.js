@@ -8,6 +8,7 @@ const createEvent = async (req, res) => {
     const {
       title,
       description,
+      categories, // array of category IDs
       location,
       price = 0,
       currency,
@@ -18,7 +19,7 @@ const createEvent = async (req, res) => {
       longitude
     } = req.body;
 
-    if (!title || !description || !location || !startDate || !endDate || !currency) {
+    if (!title || !description || !location || !startDate || !endDate || !currency || !categories || !Array.isArray(categories) || categories.length === 0) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -40,6 +41,13 @@ const createEvent = async (req, res) => {
       `);
 
     const eventId = result.recordset[0].EventID;
+
+    for (const catId of categories) {
+      await pool.request()
+        .input('eventId', sql.Int, eventId)
+        .input('categoryId', sql.Int, catId)
+        .query('INSERT INTO EventCategories (EventID, CategoryID) VALUES (@eventId, @categoryId)');
+    }
 
     if (latitude && longitude) {
       await pool.request()
@@ -89,6 +97,7 @@ const updateEvent = async (req, res) => {
     const {
       title,
       description,
+      categories, // array of category IDs
       location,
       price,
       currency,
@@ -122,6 +131,19 @@ const updateEvent = async (req, res) => {
 
     if (updateFields.length > 0) {
       await request.query(`UPDATE Events SET ${updateFields.join(', ')} WHERE EventID = @eventId`);
+    }
+
+    if (categories && Array.isArray(categories)) {
+      await pool.request()
+        .input('eventId', sql.Int, eventId)
+        .query('DELETE FROM EventCategories WHERE EventID = @eventId');
+
+      for (const catId of categories) {
+        await pool.request()
+          .input('eventId', sql.Int, eventId)
+          .input('categoryId', sql.Int, catId)
+          .query('INSERT INTO EventCategories (EventID, CategoryID) VALUES (@eventId, @categoryId)');
+      }
     }
 
     if (latitude !== undefined && longitude !== undefined) {

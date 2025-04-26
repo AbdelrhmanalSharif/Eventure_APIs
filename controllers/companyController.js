@@ -45,6 +45,7 @@ const createCompanyEvent = async (req, res) => {
         `);
 
       const eventId = result.recordset[0].EventID;
+      console.log('New event ID:', eventId);
 
       for (const catId of categories) {
         await new sql.Request(transaction)
@@ -99,6 +100,7 @@ const getCompanyEvents = async (req, res) => {
 
 // Update a company's event
 const updateCompanyEvent = async (req, res) => {
+  console.log(req.user.userId);
   try {
     const companyId = req.user.userId;
     const eventId = parseInt(req.params.id);
@@ -121,6 +123,9 @@ const updateCompanyEvent = async (req, res) => {
     const check = await pool.request()
       .input('eventId', sql.Int, eventId)
       .query('SELECT CompanyID FROM Events WHERE EventID = @eventId');
+    
+    console.log(check);
+    console.log(companyId);
 
     if (check.recordset.length === 0 || check.recordset[0].CompanyID !== companyId) {
       return res.status(403).json({ message: 'Unauthorized to edit this event' });

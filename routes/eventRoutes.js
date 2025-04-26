@@ -16,5 +16,6 @@ router.post(
     upload.multiple,
     eventController.uploadMultipleEventImages
   );
+router.delete('/image/:imageId/delete', eventController.deleteImage);
 
 module.exports = router;
