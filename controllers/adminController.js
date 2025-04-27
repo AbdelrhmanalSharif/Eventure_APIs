@@ -1,5 +1,5 @@
-const { sql, poolPromise } = require('../config/database');
-const { getFullEventById } = require('../utils/fetchFullEvent');
+const { sql, poolPromise } = require("../config/database");
+const { getFullEventById } = require("../utils/fetchFullEvent");
 
 // Get all non-admin users, grouped by type
 const getAllUsers = async (req, res) => {
@@ -9,19 +9,21 @@ const getAllUsers = async (req, res) => {
       SELECT UserID, FullName, Email, UserType, CreatedAt
       FROM Users
       WHERE UserType != 'Admin'
-      ORDER BY UserType, CreatedAt DESC
+      ORDER BY UserID ASC
     `);
 
-    const grouped = result.recordset.reduce((acc, user) => {
-      if (!acc[user.UserType]) acc[user.UserType] = [];
-      acc[user.UserType].push(user);
-      return acc;
-    }, {});
+    // const grouped = result.recordset.reduce((acc, user) => {
+    //   if (!acc[user.UserType]) acc[user.UserType] = [];
+    //   acc[user.UserType].push(user);
+    //   return acc;
+    // }, {});
 
-    res.status(200).json(grouped);
+    res.status(200).json(result.recordset);
   } catch (error) {
-    console.error('Admin getAllUsers error:', error);
-    res.status(500).json({ message: 'Failed to fetch users', error: error.message });
+    console.error("Admin getAllUsers error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch users", error: error.message });
   }
 };
 
@@ -43,8 +45,10 @@ const getAllEvents = async (req, res) => {
 
     res.status(200).json(events);
   } catch (error) {
-    console.error('Admin getAllEvents error:', error);
-    res.status(500).json({ message: 'Failed to fetch events', error: error.message });
+    console.error("Admin getAllEvents error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch events", error: error.message });
   }
 };
 
@@ -53,12 +57,16 @@ const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
     const pool = await poolPromise;
-    await pool.request().input('id', sql.Int, id)
-      .query('DELETE FROM Users WHERE UserID = @id');
-    res.status(200).json({ message: 'User deleted successfully' });
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query("DELETE FROM Users WHERE UserID = @id");
+    res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
-    console.error('Admin deleteUser error:', error);
-    res.status(500).json({ message: 'Failed to delete user', error: error.message });
+    console.error("Admin deleteUser error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete user", error: error.message });
   }
 };
 
@@ -67,12 +75,16 @@ const deleteEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const pool = await poolPromise;
-    await pool.request().input('id', sql.Int, id)
-      .query('DELETE FROM Events WHERE EventID = @id');
-    res.status(200).json({ message: 'Event deleted successfully' });
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query("DELETE FROM Events WHERE EventID = @id");
+    res.status(200).json({ message: "Event deleted successfully" });
   } catch (error) {
-    console.error('Admin deleteEvent error:', error);
-    res.status(500).json({ message: 'Failed to delete event', error: error.message });
+    console.error("Admin deleteEvent error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete event", error: error.message });
   }
 };
 
@@ -90,8 +102,10 @@ const getPlatformStats = async (req, res) => {
 
     res.status(200).json(result.recordset[0]);
   } catch (error) {
-    console.error('Admin getPlatformStats error:', error);
-    res.status(500).json({ message: 'Failed to fetch stats', error: error.message });
+    console.error("Admin getPlatformStats error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch stats", error: error.message });
   }
 };
 
@@ -100,5 +114,5 @@ module.exports = {
   getAllEvents,
   deleteUser,
   deleteEvent,
-  getPlatformStats
+  getPlatformStats,
 };
