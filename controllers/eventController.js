@@ -297,6 +297,48 @@ const deleteImage = async (req, res) => {
   }
 };
 
+const getRandomImages = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool
+      .request()
+      .query(
+        `SELECT TOP 6 ImageID, ImageURL FROM EventImages ORDER BY NEWID()`
+      );
+    return res.status(200).json(result.recordset);
+  } catch (error) {
+    console.error("Get random images error:", error);
+    res.status(500).json({
+      message: "Server error while fetching random images",
+      error: error.message,
+    });
+  }
+};
+
+const getPopularEvents = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT TOP 5 e.EventID, e.Title,
+      (SELECT AVG(CAST(r.Rating AS FLOAT)) FROM Reviews r WHERE r.EventID = e.EventID) AS AverageRating,
+      (SELECT TOP 1 ImageURL FROM EventImages ei WHERE ei.EventID = e.EventID) AS ImageURL
+      FROM Events e ORDER BY 
+      (SELECT AVG(CAST(r.Rating AS FLOAT)) FROM Reviews r WHERE r.EventID = e.EventID) DESC
+    `);
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: "No popular events found" });
+    }
+    res.status(200).json(result.recordset);
+  } catch (error) {
+    console.log("here");
+    // console.error("Get popular events error:", error);
+    res.status(500).json({
+      message: "Server error while fetching popular events",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllEvents,
   getEventById,
@@ -304,4 +346,6 @@ module.exports = {
   deleteEventImage,
   deleteImage,
   uploadMultipleEventImages,
+  getRandomImages,
+  getPopularEvents,
 };

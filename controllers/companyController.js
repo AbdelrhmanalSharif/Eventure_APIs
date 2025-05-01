@@ -133,7 +133,7 @@ const updateCompanyEvent = async (req, res) => {
     const {
       title,
       description,
-      categories, // array of category IDs
+      category, // array of category IDs
       location,
       price,
       currency,
@@ -143,6 +143,8 @@ const updateCompanyEvent = async (req, res) => {
       latitude,
       longitude,
     } = req.body;
+
+    console.log("Update event data:", req.body);
 
     const pool = await poolPromise;
 
@@ -202,12 +204,12 @@ const updateCompanyEvent = async (req, res) => {
 
       await eventRequest.query(updateQuery);
 
-      if (categories && Array.isArray(categories)) {
+      if (category && Array.isArray(category)) {
         await new sql.Request(transaction)
           .input("eventId", sql.Int, eventId)
           .query("DELETE FROM EventCategories WHERE EventID = @eventId");
 
-        for (const catId of categories) {
+        for (const catId of category) {
           await new sql.Request(transaction)
             .input("eventId", sql.Int, eventId)
             .input("categoryId", sql.Int, catId)
