@@ -1,5 +1,5 @@
-const { sql, poolPromise } = require('../config/database');
-const { getFullEventById } = require('../utils/fetchFullEvent');
+const { sql, poolPromise } = require("../config/database");
+const { getFullEventById } = require("../utils/fetchFullEvent");
 
 // Add a recommendation (manual)
 const addRecommendation = async (req, res) => {
@@ -8,26 +8,30 @@ const addRecommendation = async (req, res) => {
     const { eventId } = req.body;
 
     if (!eventId) {
-      return res.status(400).json({ message: 'Event ID is required' });
+      return res.status(400).json({ message: "Event ID is required" });
     }
 
     const pool = await poolPromise;
 
-    await pool.request()
-      .input('userId', sql.Int, userId)
-      .input('eventId', sql.Int, eventId)
-      .query(`
+    await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .input("eventId", sql.Int, eventId).query(`
         INSERT INTO Recommendations (UserID, EventID)
         VALUES (@userId, @eventId)
       `);
 
-    res.status(201).json({ message: 'Event recommended successfully' });
+    res.status(201).json({ message: "Event recommended successfully" });
   } catch (error) {
     if (error.originalError?.info?.number === 2627) {
-      return res.status(409).json({ message: 'You already recommended this event' });
+      return res
+        .status(409)
+        .json({ message: "You already recommended this event" });
     }
-    console.error('Add recommendation error:', error);
-    res.status(500).json({ message: 'Server error while adding recommendation' });
+    console.error("Add recommendation error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error while adding recommendation" });
   }
 };
 
@@ -37,9 +41,12 @@ const getRecommendationsForUser = async (req, res) => {
     const userId = req.user.userId;
     const pool = await poolPromise;
 
-    const result = await pool.request()
-      .input('userId', sql.Int, userId)
-      .query(`SELECT RecommendationID, EventID FROM Recommendations WHERE UserID = @userId ORDER BY RecommendedOn DESC`);
+    const result = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query(
+        `SELECT RecommendationID, EventID FROM Recommendations WHERE UserID = @userId ORDER BY RecommendedOn DESC`
+      );
 
     const recommendations = [];
     for (const row of result.recordset) {
@@ -47,15 +54,17 @@ const getRecommendationsForUser = async (req, res) => {
       if (event) {
         recommendations.push({
           recommendationId: row.RecommendationID,
-          event
+          event,
         });
       }
     }
 
     res.status(200).json(recommendations);
   } catch (error) {
-    console.error('Get recommendations error:', error);
-    res.status(500).json({ message: 'Server error while fetching recommendations' });
+    console.error("Get recommendations error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error while fetching recommendations" });
   }
 };
 
@@ -65,30 +74,31 @@ const getBehavioralRecommendations = async (req, res) => {
     const userId = req.user.userId;
     const pool = await poolPromise;
 
-    const bookingCats = await pool.request()
-      .input('userId', sql.Int, userId)
+    const bookingCats = await pool.request().input("userId", sql.Int, userId)
       .query(`
-        SELECT TOP 3 e.Category, COUNT(*) AS Count
+        SELECT TOP 3 c.Name, COUNT(*) AS CountCat
         FROM Bookings b
         JOIN Events e ON b.EventID = e.EventID
+        JOIN EventCategories ec ON e.EventID = ec.EventID
+        JOIN Categories c ON ec.CategoryID = c.CategoryID
         WHERE b.UserID = @userId
-        GROUP BY e.Category
-        ORDER BY Count DESC
+        GROUP BY c.Name
+        ORDER BY CountCat DESC;
       `);
 
-    const reviewCats = await pool.request()
-      .input('userId', sql.Int, userId)
+    const reviewCats = await pool.request().input("userId", sql.Int, userId)
       .query(`
-        SELECT TOP 3 e.Category, COUNT(*) AS Count
+        SELECT TOP 3 c.Name, COUNT(*) AS CountCat
         FROM Reviews r
         JOIN Events e ON r.EventID = e.EventID
-        WHERE r.UserID = @userId AND r.Rating >= 4
-        GROUP BY e.Category
-        ORDER BY Count DESC
+        JOIN EventCategories ec ON e.EventID = ec.EventID
+        JOIN Categories c ON ec.CategoryID = c.CategoryID
+        WHERE r.UserID = @userId
+        GROUP BY c.Name
+        ORDER BY CountCat DESC;
       `);
 
-    const searchLocs = await pool.request()
-      .input('userId', sql.Int, userId)
+    const searchLocs = await pool.request().input("userId", sql.Int, userId)
       .query(`
         SELECT TOP 3 SearchQuery
         FROM SearchHistory
@@ -97,20 +107,29 @@ const getBehavioralRecommendations = async (req, res) => {
       `);
 
     const topCategories = new Set();
-    bookingCats.recordset.forEach(row => topCategories.add(row.Category));
-    reviewCats.recordset.forEach(row => topCategories.add(row.Category));
-    const topLocations = searchLocs.recordset.map(row => row.SearchQuery);
+    bookingCats.recordset.forEach((row) => topCategories.add(row.Name));
+    reviewCats.recordset.forEach((row) => topCategories.add(row.Name));
+    const topLocations = searchLocs.recordset.map((row) => row.SearchQuery);
 
     if (topCategories.size === 0 && topLocations.length === 0) {
-      return res.status(404).json({ message: 'Not enough user data to generate recommendations' });
+      console.log("No categories or locations found for user:", userId);
+      return res
+        .status(404)
+        .json({ message: "Not enough user data to generate recommendations" });
     }
 
     // Build raw eventId result
-    let query = `SELECT DISTINCT TOP 10 e.EventID FROM Events e WHERE e.StartDate >= GETDATE()`;
+    let query = `SELECT DISTINCT TOP 10 e.EventID 
+                FROM Events e 
+                JOIN EventCategories ec ON e.EventID = ec.EventID
+                JOIN Categories c on ec.CategoryID = c.CategoryID
+                WHERE e.StartDate >= GETDATE()`;
     const queryParams = [];
 
     if (topCategories.size > 0) {
-      const categoryConditions = [...topCategories].map((cat, i) => `e.Category = @cat${i}`).join(' OR ');
+      const categoryConditions = [...topCategories]
+        .map((cat, i) => `c.Name = @cat${i}`)
+        .join(" OR ");
       query += ` AND (${categoryConditions})`;
       [...topCategories].forEach((cat, i) => {
         queryParams.push({ name: `cat${i}`, type: sql.NVarChar, value: cat });
@@ -118,15 +137,21 @@ const getBehavioralRecommendations = async (req, res) => {
     }
 
     if (topLocations.length > 0) {
-      const locationConditions = topLocations.map((loc, i) => `e.Location LIKE @loc${i}`).join(' OR ');
+      const locationConditions = topLocations
+        .map((loc, i) => `e.Location LIKE @loc${i}`)
+        .join(" OR ");
       query += ` AND (${locationConditions})`;
       topLocations.forEach((loc, i) => {
-        queryParams.push({ name: `loc${i}`, type: sql.NVarChar, value: `%${loc}%` });
+        queryParams.push({
+          name: `loc${i}`,
+          type: sql.NVarChar,
+          value: `%${loc}%`,
+        });
       });
     }
 
     const request = pool.request();
-    queryParams.forEach(p => request.input(p.name, p.type, p.value));
+    queryParams.forEach((p) => request.input(p.name, p.type, p.value));
 
     const result = await request.query(query);
     const recommendedEvents = [];
@@ -138,13 +163,15 @@ const getBehavioralRecommendations = async (req, res) => {
 
     res.status(200).json(recommendedEvents);
   } catch (error) {
-    console.error('Behavioral recommendation error:', error);
-    res.status(500).json({ message: 'Server error while generating recommendations' });
+    console.error("Behavioral recommendation error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error while generating recommendations" });
   }
 };
 
 module.exports = {
   addRecommendation,
   getRecommendationsForUser,
-  getBehavioralRecommendations
+  getBehavioralRecommendations,
 };
