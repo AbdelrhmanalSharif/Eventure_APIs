@@ -34,7 +34,7 @@ const getAllEvents = async (req, res) => {
 
     const result = await pool.request().query(`
       SELECT EventID FROM Events
-      ORDER BY StartDate DESC
+      ORDER BY EventID ASC
     `);
 
     const events = [];
