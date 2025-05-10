@@ -15,7 +15,7 @@ const getAllEvents = async (req, res) => {
       maxPrice,
       startDate,
       endDate,
-    } = req.query;
+    } = req.body;
 
     const offset = (page - 1) * limit;
 
@@ -27,26 +27,32 @@ const getAllEvents = async (req, res) => {
       FROM Events e
       LEFT JOIN Users u ON e.CompanyID = u.UserID
       LEFT JOIN MapsIntegration m ON e.EventID = m.EventID
-      WHERE 1=1
     `;
+
+    let whereClause = " WHERE 1=1";
 
     const queryParams = [];
 
-    if (category) {
-      query += ` AND EXISTS (
-        SELECT 1 FROM EventCategories ec
-        JOIN Categories c ON ec.CategoryID = c.CategoryID
-        WHERE ec.EventID = e.EventID AND c.Name = @category
+    if (category && Array.isArray(category) && category.length > 0) {
+      const categoryPlaceholders = category
+        .map((_, index) => `@category${index}`)
+        .join(", ");
+      whereClause += ` AND EXISTS (
+      SELECT 1 FROM EventCategories ec
+      JOIN Categories c ON ec.CategoryID = c.CategoryID
+      WHERE ec.EventID = e.EventID AND c.Name IN (${categoryPlaceholders})
       )`;
-      queryParams.push({
-        name: "category",
-        type: sql.NVarChar,
-        value: category,
+      category.forEach((cat, index) => {
+        queryParams.push({
+          name: `category${index}`,
+          type: sql.NVarChar,
+          value: cat,
+        });
       });
     }
 
     if (location) {
-      query += ` AND e.Location LIKE @location`;
+      whereClause += ` AND e.Location LIKE @location`;
       queryParams.push({
         name: "location",
         type: sql.NVarChar,
@@ -55,7 +61,7 @@ const getAllEvents = async (req, res) => {
     }
 
     if (minPrice) {
-      query += ` AND e.Price >= @minPrice`;
+      whereClause += ` AND e.Price >= @minPrice`;
       queryParams.push({
         name: "minPrice",
         type: sql.Decimal(10, 2),
@@ -64,7 +70,7 @@ const getAllEvents = async (req, res) => {
     }
 
     if (maxPrice) {
-      query += ` AND e.Price <= @maxPrice`;
+      whereClause += ` AND e.Price <= @maxPrice`;
       queryParams.push({
         name: "maxPrice",
         type: sql.Decimal(10, 2),
@@ -73,7 +79,7 @@ const getAllEvents = async (req, res) => {
     }
 
     if (startDate) {
-      query += ` AND e.StartDate >= @startDate`;
+      whereClause += ` AND e.StartDate >= @startDate`;
       queryParams.push({
         name: "startDate",
         type: sql.DateTime,
@@ -82,7 +88,7 @@ const getAllEvents = async (req, res) => {
     }
 
     if (endDate) {
-      query += ` AND e.EndDate <= @endDate`;
+      whereClause += ` AND e.EndDate <= @endDate`;
       queryParams.push({
         name: "endDate",
         type: sql.DateTime,
@@ -90,7 +96,7 @@ const getAllEvents = async (req, res) => {
       });
     }
 
-    query += ` ORDER BY e.StartDate ASC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
+    query += `${whereClause} ORDER BY e.StartDate ASC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
     queryParams.push({ name: "offset", type: sql.Int, value: offset });
     queryParams.push({ name: "limit", type: sql.Int, value: parseInt(limit) });
 
@@ -101,7 +107,7 @@ const getAllEvents = async (req, res) => {
       countRequest.input(param.name, param.type, param.value)
     );
     const countResult = await countRequest.query(
-      `SELECT COUNT(*) AS TotalCount FROM Events e WHERE 1=1`
+      `SELECT COUNT(*) AS TotalCount FROM Events e ${whereClause}`
     );
     const totalCount = countResult.recordset[0].TotalCount;
 
@@ -132,6 +138,8 @@ const getAllEvents = async (req, res) => {
         `);
       event.categories = categoryResult.recordset.map((c) => c.Name);
     }
+
+    console.log("Events:", events);
 
     res.status(200).json({
       events,
@@ -181,6 +189,32 @@ const getEventCategories = async (req, res) => {
     console.error("Get categories error:", error);
     res.status(500).json({
       message: "Server error while fetching categories",
+      error: error.message,
+    });
+  }
+};
+
+const getMajorCategories = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const majorCatResult = await pool
+      .request()
+      .query(
+        `Select CatID as MajorCatID, CatName, Icon from MajorCategories order by CatID asc`
+      );
+    const majorCategories = majorCatResult.recordset;
+    for (const majorCat of majorCategories) {
+      const subCatResult = await pool
+        .request()
+        .input("majorCatId", sql.Int, majorCat.MajorCatID).query(`
+        Select c.CategoryID, c.Name from Categories c Join GroupedCategories gc on c.CategoryID = gc.CatID where gc.MajorCatID = @majorCatId;`);
+      majorCat.SubCategories = subCatResult.recordset;
+    }
+    res.status(200).json(majorCategories);
+  } catch (error) {
+    console.error("Get major categories error:", error);
+    res.status(500).json({
+      message: "Server error while fetching major categories",
       error: error.message,
     });
   }
@@ -348,4 +382,5 @@ module.exports = {
   uploadMultipleEventImages,
   getRandomImages,
   getPopularEvents,
+  getMajorCategories,
 };
