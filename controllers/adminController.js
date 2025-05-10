@@ -6,7 +6,7 @@ const getAllUsers = async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool.request().query(`
-      SELECT UserID, FullName, Email, UserType, CreatedAt
+      SELECT UserID, FullName, Email, UserType, CreatedAt, ProfilePicture
       FROM Users
       WHERE UserType != 'Admin'
       ORDER BY UserID ASC

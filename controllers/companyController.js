@@ -19,6 +19,8 @@ const createCompanyEvent = async (req, res) => {
       longitude,
     } = req.body;
 
+    console.log("Create event data:", req.body);
+
     if (
       !title ||
       !description ||
@@ -126,7 +128,6 @@ const getCompanyEvents = async (req, res) => {
 
 // Update a company's event
 const updateCompanyEvent = async (req, res) => {
-  console.log(req.user.userId);
   try {
     const companyId = req.user.userId;
     const eventId = parseInt(req.params.id);
