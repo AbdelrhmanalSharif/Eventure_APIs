@@ -194,6 +194,23 @@ const getEventCategories = async (req, res) => {
   }
 };
 
+const getUngroupedCategories = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      Select c.CategoryID, c.Name from Categories c
+      Where c.CategoryID not in
+      (Select Distinct gc.CatID from GroupedCategories gc);`);
+    res.status(200).json(result.recordset);
+  } catch (error) {
+    console.error("Get ungrouped categories error:", error);
+    res.status(500).json({
+      message: "Server error while fetching ungrouped categories",
+      error: error.message,
+    });
+  }
+};
+
 const getMajorCategories = async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -373,6 +390,186 @@ const getPopularEvents = async (req, res) => {
   }
 };
 
+const updateEventCategories = async (req, res) => {
+  try {
+    const majorCatID = parseInt(req.params.majorCatID);
+    const { CatName, Icon, SubCategories, NewSubCategories } = req.body;
+    console.log(majorCatID);
+    console.log(req.body);
+    if (!CatName || !Icon) {
+      return res.status(400).json({ message: "CatName and Icon are required" });
+    }
+
+    const pool = await poolPromise;
+
+    //Probably means user deleted all subcategories
+    if (!SubCategories || !Array.isArray(SubCategories)) {
+      await pool.request().input("majorCatID", sql.Int, majorCatID).query(`
+        Delete from GroupedCategories where MajorCatID = @majorCatID;`);
+    }
+
+    //Add new subcategories to Categories table
+    if (NewSubCategories && Array.isArray(NewSubCategories)) {
+      for (const subCat of NewSubCategories) {
+        if (subCat.CategoryID < 0) {
+          const result = await pool
+            .request()
+            .input("catName", sql.NVarChar, subCat.Name)
+            .query(`INSERT INTO Categories (Name) VALUES (@catName);`);
+          if (!result.rowsAffected[0]) {
+            return res
+              .status(400)
+              .json({ message: "Failed to insert new subcategory" });
+          }
+        }
+      }
+    }
+
+    //Update existing subcategories
+    for (const subCat of SubCategories) {
+      const result = await pool
+        .request()
+        .input("catName", sql.NVarChar, subCat.Name)
+        .input("catId", sql.Int, subCat.CategoryID)
+        .query(
+          `UPDATE Categories SET Name = @catName WHERE CategoryID = @catId;`
+        );
+      if (!result.rowsAffected[0]) {
+        return res
+          .status(400)
+          .json({ message: "Failed to update existing subcategory" });
+      }
+    }
+
+    //Update major category
+    const updateMajorCatResult = await pool
+      .request()
+      .input("majorCatID", sql.Int, majorCatID)
+      .input("catName", sql.NVarChar, CatName)
+      .input("icon", sql.NVarChar, Icon).query(`
+      UPDATE MajorCategories SET CatName = @catName, Icon = @icon WHERE CatID = @majorCatID;`);
+
+    if (!updateMajorCatResult.rowsAffected[0]) {
+      console.error("Failed to update major category");
+      return res
+        .status(400)
+        .json({ message: "Failed to update major category" });
+    }
+
+    //Delete existing subcategories to add the new and existing ones
+    await pool
+      .request()
+      .input("majorCatID", sql.Int, majorCatID)
+      .query(`DELETE FROM GroupedCategories WHERE MajorCatID = @majorCatID;`);
+
+    //Add new subcategories to grouped categories
+    for (const subCat of NewSubCategories) {
+      const result = await pool
+        .request()
+        .input("majorCatID", sql.Int, majorCatID)
+        .input("catName", sql.NVarChar, subCat.Name)
+        .query(
+          `INSERT INTO GroupedCategories (MajorCatID, CatID) 
+          VALUES (@majorCatID, (Select CategoryID from Categories where Name = @catName));`
+        );
+      if (!result.rowsAffected[0]) {
+        return res
+          .status(400)
+          .json({ message: "Failed to insert new subcategory" });
+      }
+    }
+
+    //Add existing subcategories to grouped categories
+    for (const subCat of SubCategories) {
+      const result = await pool
+        .request()
+        .input("majorCatID", sql.Int, majorCatID)
+        .input("catId", sql.Int, subCat.CategoryID)
+        .query(
+          `INSERT INTO GroupedCategories (MajorCatID, CatID) 
+          VALUES (@majorCatID, @catId);`
+        );
+      if (!result.rowsAffected[0]) {
+        return res
+          .status(400)
+          .json({ message: "Failed to update list of subcategories" });
+      }
+    }
+
+    res.status(200).json({ message: "Major category updated successfully" });
+  } catch (error) {
+    console.error("Update event categories error:", error);
+    res.status(500).json({
+      message: "Server error while updating event categories",
+      error: error.message,
+    });
+  }
+};
+
+const deleteMajorCategory = async (req, res) => {
+  try {
+    const majorCatID = parseInt(req.params.majorCatID);
+    const pool = await poolPromise;
+    await pool.request().input("majorCatID", sql.Int, majorCatID).query(`
+      Delete from GroupedCategories where MajorCatID = @majorCatID;
+      DELETE FROM MajorCategories WHERE CatID = @majorCatID;`);
+    res.status(200).json({ message: "Major category deleted successfully" });
+  } catch (error) {
+    console.error("Delete major category error:", error);
+    res.status(500).json({
+      message: "Server error while deleting major category",
+      error: error.message,
+    });
+  }
+};
+
+const createMajorCategory = async (req, res) => {
+  try {
+    const { CatName } = req.body;
+    const pool = await poolPromise;
+    if (!CatName) {
+      return res.status(401).json({ message: "Category name is required" });
+    }
+
+    //Check if the category already exists
+    const existingCategory = await pool
+      .request()
+      .input("catName", sql.NVarChar, CatName)
+      .query("SELECT * FROM MajorCategories WHERE CatName = @catName");
+    if (existingCategory.recordset.length > 0) {
+      return res.status(300).json({ message: "Category name already exists" });
+    }
+
+    //Insert the new category
+    const result = await pool
+      .request()
+      .input("catName", sql.NVarChar, CatName)
+      .query("INSERT INTO MajorCategories (CatName) VALUES (@catName);");
+    if (!result.rowsAffected[0]) {
+      return res
+        .status(400)
+        .json({ message: "Failed to insert new major category" });
+    }
+
+    //Get the ID of the newly created category
+    const newCategory = await pool
+      .request()
+      .input("catName", sql.NVarChar, CatName)
+      .query("SELECT CatID FROM MajorCategories WHERE CatName = @catName");
+    const newCategoryId = newCategory.recordset[0].CatID;
+    res.status(200).json({
+      message: "Major category created successfully",
+      majorCatID: newCategoryId,
+    });
+  } catch (error) {
+    console.error("Create major category error:", error);
+    res.status(500).json({
+      message: "Server error while creating major category",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllEvents,
   getEventById,
@@ -383,4 +580,8 @@ module.exports = {
   getRandomImages,
   getPopularEvents,
   getMajorCategories,
+  getUngroupedCategories,
+  updateEventCategories,
+  deleteMajorCategory,
+  createMajorCategory,
 };
