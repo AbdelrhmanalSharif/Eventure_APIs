@@ -98,6 +98,18 @@ const getBehavioralRecommendations = async (req, res) => {
         ORDER BY CountCat DESC;
       `);
 
+    const bookmarkCats = await pool.request().input("userId", sql.Int, userId)
+      .query(`
+        SELECT TOP 3 c.Name, COUNT(*) AS CountCat
+        FROM Bookmarks b
+        JOIN Events e ON b.EventID = e.EventID
+        JOIN EventCategories ec ON e.EventID = ec.EventID
+        JOIN Categories c ON ec.CategoryID = c.CategoryID
+        WHERE b.UserID = @userId
+        GROUP BY c.Name
+        ORDER BY CountCat DESC;
+      `);
+
     const searchLocs = await pool.request().input("userId", sql.Int, userId)
       .query(`
         SELECT TOP 3 SearchQuery
@@ -109,6 +121,7 @@ const getBehavioralRecommendations = async (req, res) => {
     const topCategories = new Set();
     bookingCats.recordset.forEach((row) => topCategories.add(row.Name));
     reviewCats.recordset.forEach((row) => topCategories.add(row.Name));
+    bookmarkCats.recordset.forEach((row) => topCategories.add(row.Name));
     const topLocations = searchLocs.recordset.map((row) => row.SearchQuery);
 
     if (topCategories.size === 0 && topLocations.length === 0) {
@@ -128,38 +141,38 @@ const getBehavioralRecommendations = async (req, res) => {
 
     if (topCategories.size > 0) {
       const categoryConditions = [...topCategories]
-        .map((cat, i) => `c.Name = @cat${i}`)
+        .map((cat, i) => `c.Name = '${cat}'`)
         .join(" OR ");
       query += ` AND (${categoryConditions})`;
-      [...topCategories].forEach((cat, i) => {
-        queryParams.push({ name: `cat${i}`, type: sql.NVarChar, value: cat });
-      });
     }
 
     if (topLocations.length > 0) {
       const locationConditions = topLocations
-        .map((loc, i) => `e.Location LIKE @loc${i}`)
+        .map(
+          (loc, i) => `e.Title LIKE '%${loc}%' OR e.Description LIKE '%${loc}%'`
+        )
         .join(" OR ");
       query += ` AND (${locationConditions})`;
-      topLocations.forEach((loc, i) => {
-        queryParams.push({
-          name: `loc${i}`,
-          type: sql.NVarChar,
-          value: `%${loc}%`,
-        });
-      });
     }
 
     const request = pool.request();
     queryParams.forEach((p) => request.input(p.name, p.type, p.value));
-
     const result = await request.query(query);
+
+    if (result.recordset.length === 0) {
+      console.log("No events found for user:", userId);
+      return res
+        .status(404)
+        .json({ message: "Not enough user data to generate recommendations" });
+    }
     const recommendedEvents = [];
 
     for (const row of result.recordset) {
       const fullEvent = await getFullEventById(row.EventID);
       if (fullEvent) recommendedEvents.push(fullEvent);
     }
+
+    console.log("Behavioral recommendations:", recommendedEvents);
 
     res.status(200).json(recommendedEvents);
   } catch (error) {

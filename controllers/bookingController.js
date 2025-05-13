@@ -79,7 +79,7 @@ const bookEvent = async (req, res) => {
         SELECT SCOPE_IDENTITY() AS BookingID;
       `);
 
-    res.status(201).json({
+    res.status(200).json({
       message: "Booking successful",
       bookingId: bookingResult.recordset[0].BookingID,
     });
@@ -102,7 +102,7 @@ const getUserBookings = async (req, res) => {
       .request()
       .input("userId", sql.Int, userId)
       .query(
-        `SELECT BookingID, EventID, BookingDate FROM Bookings WHERE UserID = @userId ORDER BY BookedAt DESC`
+        `SELECT BookingID, EventID, BookingDate FROM Bookings WHERE UserID = @userId ORDER BY BookingDate DESC`
       );
 
     const bookings = [];
@@ -112,7 +112,7 @@ const getUserBookings = async (req, res) => {
       if (event) {
         bookings.push({
           bookingId: row.BookingID,
-          bookedAt: row.BookedAt,
+          bookedAt: row.BookingDate,
           event,
         });
       }
@@ -200,10 +200,40 @@ const getBookedUserForEvent = async (req, res) => {
   }
 };
 
+// Verify if the user has booked the event
+const verifyBooking = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const eventId = parseInt(req.params.eventId);
+    const pool = await poolPromise;
+
+    const result = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .input("eventId", sql.Int, eventId)
+      .query(
+        "SELECT * FROM Bookings WHERE UserID = @userId AND EventID = @eventId"
+      );
+
+    if (result.recordset.length > 0) {
+      return res.status(200).json({ booked: true });
+    } else {
+      return res.status(200).json({ booked: false });
+    }
+  } catch (error) {
+    console.error("Verify booking error:", error);
+    res.status(500).json({
+      message: "Server error while verifying booking",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   bookEvent,
   getUserBookings,
   cancelBooking,
   getAllBookings,
   getBookedUserForEvent,
+  verifyBooking,
 };
