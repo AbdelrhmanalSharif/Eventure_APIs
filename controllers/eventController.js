@@ -139,8 +139,6 @@ const getAllEvents = async (req, res) => {
       event.categories = categoryResult.recordset.map((c) => c.Name);
     }
 
-    console.log("Events:", events);
-
     res.status(200).json({
       events,
       pagination: {

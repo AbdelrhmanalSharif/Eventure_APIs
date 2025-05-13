@@ -37,6 +37,12 @@ router.get(
 //get all booked users for a specific event for any user
 router.get("/bookings/:eventId", bookingController.getBookedUserForEvent);
 
-
+//verify if the user has booked the event
+router.get(
+  "/verify/:eventId",
+  authenticateToken,
+  authorizeRole(["Individual"]),
+  bookingController.verifyBooking
+);
 
 module.exports = router;
