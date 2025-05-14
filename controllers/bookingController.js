@@ -13,6 +13,10 @@ const bookEvent = async (req, res) => {
         .json({ message: "Event ID is required in the request body" });
     }
 
+    if (!nbOfTickets) {
+      nbOfTickets = 1; // Default to 1 ticket if not provided
+    }
+
     const pool = await poolPromise;
 
     // Check event existence and capacity
@@ -46,7 +50,7 @@ const bookEvent = async (req, res) => {
         .request()
         .input("eventId", sql.Int, eventId)
         .query(
-          "SELECT SUM(NbOfTickets) as Count FROM Bookings WHERE EventID = @eventId"
+          "SELECT ISNULL(SUM(NbOfTickets), 0) as Count FROM Bookings WHERE EventID = @eventId"
         );
 
       if (countResult.recordset[0].Count >= MaxAttendees) {
@@ -121,9 +125,10 @@ const getUserBookings = async (req, res) => {
       const event = await getFullEventById(row.EventID);
       if (event) {
         bookings.push({
-          bookingId: row.BookingID,
-          bookedAt: row.BookingDate,
-          event,
+          BookingID: row.BookingID,
+          BookingDate: row.BookingDate,
+          NbOfTickets: row.NbOfTickets,
+          Event: event,
         });
       }
     }
@@ -198,10 +203,13 @@ const getBookedUserForEvent = async (req, res) => {
       .request()
       .input("eventId", sql.Int, eventId)
       .query(
-        `SELECT u.UserID, u.FullName, u.Email, Sum(b.NbOfTickets) as NbOfBookedTickets from Users as u 
-        Join Bookings as b on u.UserID = b.UserID
-        Join Events as e on b.EventID = e.EventID
-        WHERE e.EventID = @eventId ORDER BY u.UserID ASC`
+        `SELECT u.UserID, u.FullName, u.Email, SUM(b.NbOfTickets) AS NbOfBookedTickets
+          FROM Users AS u
+          JOIN Bookings AS b ON u.UserID = b.UserID
+          JOIN Events AS e ON b.EventID = e.EventID
+          WHERE e.EventID = @eventId
+          GROUP BY u.UserID, u.FullName, u.Email
+          ORDER BY u.UserID ASC;`
       );
     res.status(200).json({
       bookedUsers: result.recordset,
