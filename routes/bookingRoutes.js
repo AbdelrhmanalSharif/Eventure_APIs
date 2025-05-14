@@ -45,4 +45,9 @@ router.get(
   bookingController.verifyBooking
 );
 
+router.get(
+  "/availableTickets/:eventId",
+  bookingController.getNbOfAvailableTickets
+);
+
 module.exports = router;
