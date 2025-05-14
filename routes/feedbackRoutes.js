@@ -23,3 +23,5 @@ router.put(
   authorizeRole(["Admin"]),
   feedbackController.setCompletedFeedback
 );
+
+module.exports = router;

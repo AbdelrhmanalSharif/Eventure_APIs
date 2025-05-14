@@ -1,5 +1,4 @@
 const { sql, poolPromise } = require("../config/database");
-const { getFullEventById } = require("../utils/fetchFullEvent");
 
 const createFeedback = async (req, res) => {
   try {
@@ -36,7 +35,12 @@ const getAllFeedback = async (req, res) => {
       return res.status(304).json({ message: "Unauthorized" });
     }
     const pool = await poolPromise;
-    const result = await pool.request().query("SELECT * FROM Feedback");
+    const result = await pool.request().query(
+      `SELECT f.FeedbackID, f.UserID, f.FeedbackText, 
+        f.CreatedAt, f.Checked, f.CheckedAt, u.FullName, u.ProfilePicture
+        FROM Feedback f
+        JOIN Users u ON f.UserID = u.UserID;`
+    );
     if (result.recordset.length === 0) {
       return res.status(404).json({ message: "No feedback found" });
     }
