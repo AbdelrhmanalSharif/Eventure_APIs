@@ -644,6 +644,7 @@ CREATE TABLE Feedback (
     CreatedAt DATETIME DEFAULT GETDATE(),
     UserID INT NOT NULL,
     Checked BIT DEFAULT 0,
+    CheckedAt DATETIME NULL,
     CONSTRAINT FK_Feedback_Users FOREIGN KEY (UserID)
         REFERENCES Users(UserID)
 );
