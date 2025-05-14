@@ -6,7 +6,7 @@ const { authenticateToken, authorizeRole } = require("../middlewares/auth");
 router.post(
   "/",
   authenticateToken,
-  authorizeRole(["Individual", "Admin", "Company"]),
+  authorizeRole(["Individual", "Company"]),
   feedbackController.createFeedback
 );
 
