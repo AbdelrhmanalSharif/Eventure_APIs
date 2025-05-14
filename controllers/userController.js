@@ -291,8 +291,8 @@ const changeProfilePicture = async (req, res) => {
     const profilePicture = req.file
       ? `/uploads/users/${req.file.filename}`
       : null;
-
-    if (!profilePicture) {
+    
+      if (!profilePicture) {
       return res.status(400).json({ message: "No image uploaded" });
     }
 
