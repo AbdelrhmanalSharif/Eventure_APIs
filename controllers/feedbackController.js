@@ -15,7 +15,8 @@ const createFeedback = async (req, res) => {
       .input("userId", sql.Int, userId)
       .input("feedbackText", sql.NVarChar, FeedbackText)
       .query(
-        "INSERT INTO Feedback (UserId, FeedbackText) VALUES (@userId, @feedbackText)"
+        `INSERT INTO Feedback (UserId, FeedbackText, CreatedAt) 
+        VALUES (@userId, @feedbackText, GETDATE())`
       );
     if (!result.rowsAffected[0]) {
       return res.status(500).json({ message: "Failed to create feedback" });

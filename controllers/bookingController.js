@@ -145,16 +145,12 @@ const getUserBookings = async (req, res) => {
 
 const getAllBookings = async (req, res) => {
   try {
-    const userId = req.user.userId;
     const pool = await poolPromise;
 
-    const result = await pool
-      .request()
-      .input("userId", sql.Int, userId)
-      .query(
-        `SELECT BookingID, EventID, UserID, BookingDate, NbOfTickets 
-        FROM Bookings WHERE UserID = @userId ORDER BY BookingID Asc`
-      );
+    const result = await pool.request().query(
+      `SELECT BookingID, EventID, UserID, BookingDate, NbOfTickets 
+        FROM Bookings ORDER BY BookingID Asc`
+    );
     res.status(200).json(result.recordset);
   } catch (error) {
     console.error("Fetch bookings error:", error);
@@ -228,6 +224,8 @@ const verifyBooking = async (req, res) => {
   try {
     const userId = req.user.userId;
     const eventId = parseInt(req.params.eventId);
+    console.log("User ID:", userId);
+    console.log("Event ID:", eventId);
     const pool = await poolPromise;
 
     const result = await pool
@@ -237,6 +235,8 @@ const verifyBooking = async (req, res) => {
       .query(
         "SELECT * FROM Bookings WHERE UserID = @userId AND EventID = @eventId"
       );
+
+    console.log("Verify booking result:", result.recordset);
 
     if (result.recordset.length > 0) {
       return res.status(200).json({ booked: true });

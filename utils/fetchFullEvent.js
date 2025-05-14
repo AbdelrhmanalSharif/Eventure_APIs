@@ -37,7 +37,7 @@ const getFullEventById = async (eventId) => {
   const reviewsRes = await pool.request()
     .input('eventId', sql.Int, eventId)
     .query(`
-      SELECT r.ReviewID, r.Rating, r.ReviewText, r.CreatedAt,
+      SELECT r.ReviewID, r.Rating, r.ReviewText, r.CreatedAt, u.UserID,
         u.FullName AS ReviewerName, u.ProfilePicture AS ReviewerPicture
       FROM Reviews r
       LEFT JOIN Users u ON r.UserID = u.UserID
