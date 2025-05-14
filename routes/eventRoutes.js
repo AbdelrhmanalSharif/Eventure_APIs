@@ -21,7 +21,6 @@ router.post(
 router.post(
   "/:id/images/multiple",
   authenticateToken,
-  authorizeRole(["Company", "Individual"]),
   upload.multiple,
   eventController.uploadMultipleEventImages
 );
