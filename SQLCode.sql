@@ -648,3 +648,6 @@ CREATE TABLE Feedback (
     CONSTRAINT FK_Feedback_Users FOREIGN KEY (UserID)
         REFERENCES Users(UserID)
 );
+
+ALTER TABLE [dbo].[Bookings]
+ADD [NbOfTickets] [int] NOT NULL CONSTRAINT DF_Bookings_NbOfTickets DEFAULT 1;

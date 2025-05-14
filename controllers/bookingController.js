@@ -5,7 +5,7 @@ const { getFullEventById } = require("../utils/fetchFullEvent");
 const bookEvent = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { eventId } = req.body;
+    const { eventId, nbOfTickets } = req.body;
 
     if (!eventId) {
       return res
@@ -46,11 +46,19 @@ const bookEvent = async (req, res) => {
         .request()
         .input("eventId", sql.Int, eventId)
         .query(
-          "SELECT COUNT(*) as Count FROM Bookings WHERE EventID = @eventId"
+          "SELECT SUM(NbOfTickets) as Count FROM Bookings WHERE EventID = @eventId"
         );
 
       if (countResult.recordset[0].Count >= MaxAttendees) {
         return res.status(400).json({ message: "This event is fully booked" });
+      }
+
+      // Check if the requested number of tickets exceeds the remaining capacity
+      const remainingCapacity = MaxAttendees - countResult.recordset[0].Count;
+      if (nbOfTickets > remainingCapacity) {
+        return res.status(450).json({
+          message: `Only ${remainingCapacity} tickets available for this event`,
+        });
       }
     }
 
@@ -73,9 +81,10 @@ const bookEvent = async (req, res) => {
     const bookingResult = await pool
       .request()
       .input("userId", sql.Int, userId)
-      .input("eventId", sql.Int, eventId).query(`
-        INSERT INTO Bookings (UserID, EventID)
-        VALUES (@userId, @eventId);
+      .input("eventId", sql.Int, eventId)
+      .input("nbOfTickets", sql.Int, nbOfTickets).query(`
+        INSERT INTO Bookings (UserID, EventID, NbOfTickets, BookingDate)
+        VALUES (@userId, @eventId, @nbOfTickets, GETDATE());
         SELECT SCOPE_IDENTITY() AS BookingID;
       `);
 
@@ -102,7 +111,8 @@ const getUserBookings = async (req, res) => {
       .request()
       .input("userId", sql.Int, userId)
       .query(
-        `SELECT BookingID, EventID, BookingDate FROM Bookings WHERE UserID = @userId ORDER BY BookingDate DESC`
+        `SELECT BookingID, EventID, BookingDate, NbOfTickets 
+        FROM Bookings WHERE UserID = @userId ORDER BY BookingDate DESC`
       );
 
     const bookings = [];
@@ -137,7 +147,8 @@ const getAllBookings = async (req, res) => {
       .request()
       .input("userId", sql.Int, userId)
       .query(
-        `SELECT BookingID, EventID, UserID, BookingDate FROM Bookings WHERE UserID = @userId ORDER BY BookingID Asc`
+        `SELECT BookingID, EventID, UserID, BookingDate, NbOfTickets 
+        FROM Bookings WHERE UserID = @userId ORDER BY BookingID Asc`
       );
     res.status(200).json(result.recordset);
   } catch (error) {
@@ -164,6 +175,10 @@ const cancelBooking = async (req, res) => {
         "DELETE FROM Bookings WHERE UserID = @userId AND EventID = @eventId"
       );
 
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
     res.status(200).json({ message: "Booking cancelled successfully" });
   } catch (error) {
     console.error("Cancel booking error:", error);
@@ -183,13 +198,13 @@ const getBookedUserForEvent = async (req, res) => {
       .request()
       .input("eventId", sql.Int, eventId)
       .query(
-        `SELECT u.UserID, u.FullName, u.Email from Users as u Join Bookings as b on u.UserID = b.UserID
+        `SELECT u.UserID, u.FullName, u.Email, Sum(b.NbOfTickets) as NbOfBookedTickets from Users as u 
+        Join Bookings as b on u.UserID = b.UserID
         Join Events as e on b.EventID = e.EventID
         WHERE e.EventID = @eventId ORDER BY u.UserID ASC`
       );
     res.status(200).json({
       bookedUsers: result.recordset,
-      nbOfBookings: result.recordset.length,
     });
   } catch (error) {
     console.error("Fetch booked users error:", error);
