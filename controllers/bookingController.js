@@ -252,6 +252,44 @@ const verifyBooking = async (req, res) => {
   }
 };
 
+const getNbOfAvailableTickets = async (req, res) => {
+  try {
+    const eventId = parseInt(req.params.eventId);
+    const pool = await poolPromise;
+
+    const maxAttendeesResult = await pool
+      .request()
+      .input("eventId", sql.Int, eventId)
+      .query(`Select MaxAttendees from Events where EventID = @eventId`);
+
+    if (maxAttendeesResult.recordset.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+    const maxAttendees = maxAttendeesResult.recordset[0].MaxAttendees;
+
+    const countResult = await pool
+      .request()
+      .input("eventId", sql.Int, eventId)
+      .query(
+        "SELECT ISNULL(SUM(NbOfTickets), 0) as Count FROM Bookings WHERE EventID = @eventId"
+      );
+    const nbOfBookedTickets = countResult.recordset[0].Count;
+
+    const availableTickets = maxAttendees - nbOfBookedTickets;
+    console.log(
+      `Event ID: ${eventId}, Max Attendees: ${maxAttendees}, Booked Tickets: ${nbOfBookedTickets}, Available Tickets: ${availableTickets}`
+    );
+
+    res.status(200).json({ availableTickets });
+  } catch (error) {
+    console.error("Fetch available tickets error:", error);
+    res.status(500).json({
+      message: "Server error while fetching available tickets",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   bookEvent,
   getUserBookings,
@@ -259,4 +297,5 @@ module.exports = {
   getAllBookings,
   getBookedUserForEvent,
   verifyBooking,
+  getNbOfAvailableTickets,
 };
