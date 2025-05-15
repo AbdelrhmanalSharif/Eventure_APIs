@@ -165,16 +165,13 @@ const getAllBookings = async (req, res) => {
 const cancelBooking = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const eventId = parseInt(req.params.eventId);
+    const bookingId = parseInt(req.params.bookingId);
     const pool = await poolPromise;
 
     const result = await pool
       .request()
-      .input("userId", sql.Int, userId)
-      .input("eventId", sql.Int, eventId)
-      .query(
-        "DELETE FROM Bookings WHERE UserID = @userId AND EventID = @eventId"
-      );
+      .input("bookingId", sql.Int, bookingId)
+      .query("DELETE FROM Bookings WHERE BookingID = @bookingId");
 
     if (result.rowsAffected[0] === 0) {
       return res.status(404).json({ message: "Booking not found" });
@@ -190,7 +187,7 @@ const cancelBooking = async (req, res) => {
   }
 };
 
-const getBookedUserForEvent = async (req, res) => {
+const getBookingsByEventId = async (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
     const pool = await poolPromise;
@@ -199,21 +196,23 @@ const getBookedUserForEvent = async (req, res) => {
       .request()
       .input("eventId", sql.Int, eventId)
       .query(
-        `SELECT u.UserID, u.FullName, u.Email, SUM(b.NbOfTickets) AS NbOfBookedTickets
-          FROM Users AS u
-          JOIN Bookings AS b ON u.UserID = b.UserID
-          JOIN Events AS e ON b.EventID = e.EventID
-          WHERE e.EventID = @eventId
-          GROUP BY u.UserID, u.FullName, u.Email
-          ORDER BY u.UserID ASC;`
+        `SELECT b.BookingID, b.EventID, b.UserID, b.BookingDate, 
+        b.NbOfTickets, u.FullName, u.Email, u.ProfilePicture
+        FROM Bookings b
+        JOIN Users u on b.UserID = u.UserID
+        WHERE EventID = @eventId
+        ORDER BY BookingID Asc`
       );
-    res.status(200).json({
-      bookedUsers: result.recordset,
-    });
+    if (result.recordset.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No bookings found for this event" });
+    }
+    res.status(200).json(result.recordset);
   } catch (error) {
-    console.error("Fetch booked users error:", error);
+    console.error("Fetch bookings error:", error);
     res.status(500).json({
-      message: "Server error while fetching booked users",
+      message: "Server error while fetching bookings",
       error: error.message,
     });
   }
@@ -295,7 +294,7 @@ module.exports = {
   getUserBookings,
   cancelBooking,
   getAllBookings,
-  getBookedUserForEvent,
+  getBookingsByEventId,
   verifyBooking,
   getNbOfAvailableTickets,
 };

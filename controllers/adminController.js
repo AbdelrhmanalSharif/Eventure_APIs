@@ -109,10 +109,37 @@ const getPlatformStats = async (req, res) => {
   }
 };
 
+// Get all reviews
+const getAllReviews = async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const reviewsRes = await pool.request().query(`
+      SELECT r.ReviewID, r.Rating, r.ReviewText, r.CreatedAt, u.UserID,
+        u.FullName AS ReviewerName, u.ProfilePicture AS ReviewerPicture,
+        e.EventID, e.Title 
+      FROM  Events e
+      JOIN Reviews r ON e.EventID = r.EventID
+      JOIN Users u ON r.UserID = u.UserID
+      ORDER BY r.CreatedAt DESC
+    `);
+    if (reviewsRes.recordset.length === 0) {
+      return res.status(404).json({ message: "No reviews found" });
+    }
+    const reviews = reviewsRes.recordset;
+    res.status(200).json(reviews);
+  } catch (error) {
+    console.error("Server error during retreiving reviews:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch reviews", error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getAllEvents,
   deleteUser,
   deleteEvent,
   getPlatformStats,
+  getAllReviews,
 };
