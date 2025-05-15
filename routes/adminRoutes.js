@@ -17,6 +17,9 @@ router.get('/events', adminController.getAllEvents);
 // 📊 Get platform statistics
 router.get('/stats', adminController.getPlatformStats);
 
+// Get all reviews
+router.get('/reviews', adminController.getAllReviews);
+
 // ❌ Delete a user by ID
 router.delete('/users/:id', adminController.deleteUser);
 

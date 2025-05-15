@@ -19,12 +19,7 @@ router.get(
   bookingController.getUserBookings
 );
 
-router.delete(
-  "/:eventId",
-  authenticateToken,
-  authorizeRole(["Individual"]),
-  bookingController.cancelBooking
-);
+router.delete("/:bookingId", authenticateToken, bookingController.cancelBooking);
 
 //get all bookings for admin
 router.get(
@@ -34,8 +29,12 @@ router.get(
   bookingController.getAllBookings
 );
 
-//get all booked users for a specific event for any user
-router.get("/bookings/:eventId", bookingController.getBookedUserForEvent);
+//get all bookings for a specific event
+router.get(
+  "/event/:eventId",
+  authenticateToken,
+  bookingController.getBookingsByEventId
+);
 
 //verify if the user has booked the event
 router.get(
